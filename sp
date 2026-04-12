@@ -75,12 +75,10 @@ function ESP_Utility.NewTracker(Object, CustomName, Color)
 		return 
 	end 
 
-	local OriginalModel = nil
 
 	if ObjectType == "Model" then 
 		--	print("[MODEL] Model received")
 		local Model = Object
-		OriginalModel = Model
 		CustomName = CustomName or Object.Name
 		Object = GetObjectFromModel(Model)
 		if Object == nil then 
@@ -97,7 +95,6 @@ function ESP_Utility.NewTracker(Object, CustomName, Color)
 	local self = setmetatable({}, ESP_Utility)
 	self.Name = CustomName or Object.Name
 	self.Object = Object
-	self.Model = OriginalModel
 	self.Color = Color or Color3.fromRGB(255,255,255)
 	self.Drawings = {}
 	self.ObjectType = ObjectType
@@ -194,41 +191,6 @@ function ESP_Utility:_GetDistance()
 	return magnitude(HRP.Position, self.Object.Position)
 end
 
-function ESP_Utility:_FindHumanoid()
-	local parent = self.Object.Parent
-	if parent then
-		local ok, hum = pcall(function() return parent:FindFirstChildOfClass("Humanoid") end)
-		if ok and hum then return hum end
-	end
-
-	if self.Model then
-		local ok, hum = pcall(function() return self.Model:FindFirstChildOfClass("Humanoid") end)
-		if ok and hum then return hum end
-	end
-
-	return nil
-end
-
-function ESP_Utility:_GetHealth(hum)
-	if not hum or not hum.Address then return nil, nil end
-
-	local hp, maxHp
-
-	pcall(function()
-		hp = memory_read("float", hum.Address + 404)
-		maxHp = memory_read("float", hum.Address + 436)
-	end)
-	if hp and maxHp and hp > 0 then return hp, maxHp end
-
-	pcall(function()
-		hp = hum.Health
-		maxHp = hum.MaxHealth
-	end)
-	if hp and maxHp then return hp, maxHp end
-
-	return nil, nil
-end
-
 function ESP_Utility:_SetTextPosition(DrawingObject, Y_Offset)
 	local Session = self.Session
 	local FontSize = DrawingObject.Size or 20
@@ -305,16 +267,6 @@ function ESP_Utility:_Update()
 	Square.Position = Vector2.new(min_x, min_y)
 	Square.Size = Vector2.new(boxWidth, max_y - min_y)
 
-	-- Update Tracer
-	local TracerData = self.Drawings["Tracer"]
-	if TracerData and TracerData.Visible then
-		local tracerLine = TracerData.Drawing
-		local cam = workspace.CurrentCamera
-		local vpSize = cam.ViewportSize
-		tracerLine.From = Vector2.new(vpSize.X / 2, vpSize.Y)
-		tracerLine.To = Vector2.new(self.Session.CenterX, max_y)
-	end
-
 	-- Update texts
 	for _, TextReference in self.DrawingOrder do 
 		local Data = self.Drawings[TextReference]
@@ -340,17 +292,6 @@ function ESP_Utility:_CreateSquare()
 	self.Drawings["Square"] = {
 		Drawing = NewSquare,
 		Visible = true,
-	}
-end
-
-function ESP_Utility:_CreateTracer()
-	local NewTracer = Drawing.new("Line")
-	NewTracer.Thickness = 1
-	NewTracer.Color = self.Color
-	NewTracer.Visible = false
-	self.Drawings["Tracer"] = {
-		Drawing = NewTracer,
-		Visible = false,
 	}
 end
 
@@ -401,9 +342,8 @@ function ESP_Utility:AddText(Reference, NewColor, Value, Callback)
 end
 
 function ESP_Utility:ChangeText(Reference, Value, NewColor)
-	local TextData = self.Drawings[Reference]
-
-if not TextData or not TextData.LineCount then warn("Attempting to change text of a non-text object") return end 
+	local TextData = self.Drawings[Reference] 
+	if not TextData or not TextData.LineCount then warn("Attempting to change text of a non-text object") return end 
 	if TextData.Function ~= nil then warn(string.format("TEXT: %s already has a callback assigned, remove it to use :ChangeText", Reference)) return end 
 
 	local TextDrawing = TextData.Drawing
@@ -416,7 +356,6 @@ end
 
 function ESP_Utility:BuildVisualTracker()
 	self:_CreateSquare()
-	self:_CreateTracer()
 
 	self:AddText("Distance", nil, "ok", function() 
 		return "["..math.floor(self:_GetDistance()).."m]" 
@@ -424,14 +363,6 @@ function ESP_Utility:BuildVisualTracker()
 
 	local NameString = self.Name..(self.ObjectType == "Model" and " [M]" or "")
 	self:AddText("Name", self.Color, NameString)
-
-	self:AddText("Health", Color3.fromRGB(100, 255, 100), "", function()
-		local hum = self:_FindHumanoid()
-		if not hum then return "no hp" end
-		local hp, maxHp = self:_GetHealth(hum)
-		if not hp or not maxHp then return "no hp" end
-		return string.format("%d/%d", math.floor(hp), math.floor(maxHp))
-	end)
 end
 
 function ESP_Utility:Destroy()
