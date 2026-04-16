@@ -358,10 +358,10 @@ function ESP_Utility:BuildVisualTracker()
 	self:_CreateSquare()
 
 	self:AddText("Distance", nil, "ok", function() 
-		return "["..math.floor(self:_GetDistance()).."m]" 
+		return "["..math.floor(self:_GetDistance()).."m]"
 	end)
 
-	local NameString = self.Name..(self.ObjectType == "Model" and " [M]" or "")
+	local NameString = self.Name
 	self:AddText("Name", self.Color, NameString)
 end
 
